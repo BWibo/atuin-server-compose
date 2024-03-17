@@ -1,0 +1,83 @@
+version: '3.8'
+volumes:
+
+  atuin_caddy_data:
+    external: true
+
+  atuin_db_data:
+    external: true
+
+  # Use this, if using bind mount
+  # atuin_db_data:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     o: bind
+  #     device: "${PWD}/postgresql"
+
+networks:
+  atuin_net:
+    driver: bridge
+    attachable: true
+
+services:
+
+  # Caddy ---------------------------------------------------------------------
+  caddy:
+    image: caddy:alpine
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      TLS_DOMAINS: "${TLS_DOMAINS:?TLS_DOMAINS not set}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:?ADMIN_EMAIL not set}"
+      CADDY_TLS: "${CADDY_TLS}"
+    networks:
+      - atuin_net
+    volumes:
+      - nextcloud_caddy_data:/data
+      - nextcloud_data:/var/www/html:ro
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+    logging:
+      options:
+        max-size: ${DOCKER_LOGGING_MAX_SIZE:?DOCKER_LOGGING_MAX_SIZE not set}
+        max-file: ${DOCKER_LOGGING_MAX_FILE:?DOCKER_LOGGING_MAX_FILE not set}
+
+  atuin:
+    restart: always
+    image: ghcr.io/atuinsh/atuin:<LATEST TAGGED RELEASE>
+    command: server start
+    volumes:
+      - "./config:/config"
+    ports:
+      - 8888:8888
+    networks:
+      - atuin_net
+    environment:
+      ATUIN_HOST: ${DOMAIN:?DOMAIN not set}
+      ATUIN_OPEN_REGISTRATION: "true"
+      ATUIN_DB_URI: \
+        postgres://${ATUIN_DB_USERNAME}:${ATUIN_DB_PASSWORD}@postgresql/${ATUIN_DB_NAME}
+      RUST_LOG: info,atuin_server=debug
+    logging:
+      options:
+        max-size: ${DOCKER_LOGGING_MAX_SIZE:?DOCKER_LOGGING_MAX_SIZE not set}
+        max-file: ${DOCKER_LOGGING_MAX_FILE:?DOCKER_LOGGING_MAX_FILE not set}
+
+  postgresql:
+    image: postgres:16
+    restart: unless-stopped
+    networks:
+      - atuin_net
+    volumes:
+      - atuin_db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${ATUIN_DB_USERNAME}
+      POSTGRES_PASSWORD: ${ATUIN_DB_PASSWORD}
+      POSTGRES_DB: ${ATUIN_DB_NAME}
+    logging:
+      options:
+        max-size: ${DOCKER_LOGGING_MAX_SIZE:?DOCKER_LOGGING_MAX_SIZE not set}
+        max-file: ${DOCKER_LOGGING_MAX_FILE:?DOCKER_LOGGING_MAX_FILE not set}
