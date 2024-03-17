@@ -47,7 +47,7 @@ services:
 
   atuin:
     restart: always
-    image: ghcr.io/atuinsh/atuin:<LATEST TAGGED RELEASE>
+    image: ghcr.io/atuinsh/atuin:${ATUIN_VERSION:?ATUIN_VERSION not set}
     command: server start
     volumes:
       - "./config:/config"
