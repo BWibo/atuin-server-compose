@@ -1,4 +1,3 @@
-version: '3.8'
 volumes:
 
   atuin_caddy_data:
@@ -48,29 +47,37 @@ services:
     networks:
       - atuin_net
     volumes:
-      - nextcloud_caddy_data:/data
-      - nextcloud_data:/var/www/html:ro
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
     logging:
       options:
         max-size: ${DOCKER_LOGGING_MAX_SIZE:?DOCKER_LOGGING_MAX_SIZE not set}
         max-file: ${DOCKER_LOGGING_MAX_FILE:?DOCKER_LOGGING_MAX_FILE not set}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "127.0.0.1:2019/metrics"]
+      interval: 10s
+      retries: 3
+      start_period: 5s
+      timeout: 5s
 
   atuin:
     restart: always
     image: ghcr.io/atuinsh/atuin:${ATUIN_VERSION:?ATUIN_VERSION not set}
     command: server start
     volumes:
-      - "./config:/config"
-    ports:
-      - 8888:8888
+      - atuin_config:/config/"
+    # ports:
+    #   - 8888:8888
     networks:
       - atuin_net
     environment:
-      ATUIN_HOST: ${DOMAIN:?DOMAIN not set}
+      ATUIN_HOST: ${ATUIN_HOST:?ATUIN_HOST not set}
       ATUIN_OPEN_REGISTRATION: "true"
       ATUIN_DB_URI: postgres://${ATUIN_DB_USERNAME}:${ATUIN_DB_PASSWORD}@postgresql/${ATUIN_DB_NAME}
       RUST_LOG: info,atuin_server=debug
+      # ATUIN_CONFIG_DIR: /path/to/config/dir/
+    depends_on:
+      postgresql:
+        condition: service_healthy
     logging:
       options:
         max-size: ${DOCKER_LOGGING_MAX_SIZE:?DOCKER_LOGGING_MAX_SIZE not set}
@@ -91,3 +98,9 @@ services:
       options:
         max-size: ${DOCKER_LOGGING_MAX_SIZE:?DOCKER_LOGGING_MAX_SIZE not set}
         max-file: ${DOCKER_LOGGING_MAX_FILE:?DOCKER_LOGGING_MAX_FILE not set}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ATUIN_DB_USERNAME:?ATUIN_DB_USERNAME not set} -d ${ATUIN_DB_NAME:?ATUIN_DB_NAME not set}"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+      timeout: 5s
