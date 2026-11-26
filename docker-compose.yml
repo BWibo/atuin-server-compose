@@ -47,7 +47,10 @@ services:
     networks:
       - atuin_net
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      # Mount the directory, not the file: git pull swaps the Caddyfile for a new
+      # inode, which a single-file bind mount never sees (reload would load the
+      # stale file).
+      - ./caddy:/etc/caddy:ro
     logging:
       options:
         max-size: ${DOCKER_LOGGING_MAX_SIZE:?DOCKER_LOGGING_MAX_SIZE not set}
